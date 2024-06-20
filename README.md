@@ -1,6 +1,6 @@
-# Conversión del Dataset de Diputados Andaluces para Valla
+# Conversión del dataset del Parlamento Andaluzpara Valla
 
-Este proyecto convierte un dataset de diputados andaluces en un formato adecuado para su uso con el software **Valla**. A continuación se detallan los pasos necesarios para realizar la conversión.
+Este proyecto convierte el dataset del Parlamento Andaluz en un formato adecuado para su uso con el software **Valla**. A continuación se detallan los pasos necesarios para realizar la conversión.
 
 ## Requisitos Previos
 
@@ -17,10 +17,10 @@ El script `parserXMLtoCSV.py` realiza esta tarea. Este script:
 
 - Lee archivos XML de un directorio especificado.
 - Extrae datos específicos como número de diario, tipo de sesión, órgano, fecha, tipo de iniciativa, materias, extracto, proponentes, interviniente y el texto de las intervenciones.
-- Combina párrafos de discursos en un solo texto y elimina saltos de línea y comillas dobles para una mejor integridad del CSV.
+- Combina los párrafos de discursos en un solo texto y elimina saltos de línea y comillas dobles para una mejor integridad del CSV.
 - Genera un archivo `intervenciones.csv` con los datos organizados en las siguientes columnas: número de diario, tipo de sesión, órgano, fecha, tipo de iniciativa, materias, extracto, proponentes, interviniente y texto.
 
-Para ejecutar este script, asegúrate de que los archivos XML estén en un directorio llamado `diputados` y luego ejecuta el siguiente comando:
+Para ejecutar este script, asegúrate de que los archivos XML estén en el directorio especificado en el script y luego ejecuta el siguiente comando:
 
 ```bash
 python parserXMLtoCSV.py
