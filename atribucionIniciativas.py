@@ -293,8 +293,12 @@ def procesar_archivo(path):
 
 
     # Crear y entrenar el modelo 
-    modelo = make_pipeline(TfidfVectorizer(), 
-                           LogisticRegression(multi_class='multinomial', dual=False))
+    # tfidf_vectorizer de caracteres con rango entre 2 y 5
+    tfidf_vectorizer = TfidfVectorizer(analyzer='char', ngram_range=(2, 5))
+
+    modelo = make_pipeline(tfidf_vectorizer, MultinomialNB())
+    # modelo = make_pipeline(tfidf_vectorizer, LogisticRegression(multi_class='multinomial', dual=False))
+    
     modelo.fit(X_train, y_train)
 
     # Predecir los autores de las intervenciones
