@@ -1,10 +1,8 @@
 """
-Este script está pensado para una ejecución masiva de archivos XML de iniciativas parlamentarias, extrae los intervinientes, segmenta los textos, 
-entrena un modelo y predice los autores de las intervenciones, calculando las métricas de precisión y almacenándolas en un diccionario que se 
-guarda en un archivo CSV.
+Este script contiene las funciones necesarias para procesar un archivo XML con una iniciativa parlamentaria,
+extraer los intervinientes, segmentar los textos, entrenar un modelo y predecir los autores de las intervenciones.
 """
 import pandas as pd
-import csv
 import xml.etree.ElementTree as ET
 import re
 import os
@@ -13,13 +11,12 @@ import math
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.model_selection import train_test_split
 from sklearn.naive_bayes import MultinomialNB
-from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import make_pipeline
 from sklearn import metrics
 from sklearn.utils import resample
-import shutil
-import argparse
+from sklearn.linear_model import LogisticRegression
 
+# Funciones clave
 
 def procesar_etiq_intervienen(etiq_intervienen):
     """
@@ -322,20 +319,30 @@ def preprocesar_texto(texto):
     texto = ' '.join(texto.split())  # Eliminar espacios extra
     return texto
 
+import xml.etree.ElementTree as ET
+import pandas as pd
+import math
+from sklearn.model_selection import train_test_split
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.linear_model import LogisticRegression
+from sklearn.pipeline import make_pipeline
+from sklearn.utils import resample
+import re
+
 def procesar_archivo(path):
     """
-    Procesa un archivo XML con una iniciativa parlamentaria, extrae los intervinientes, segmenta los textos, entrena un modelo 
-    y predice los autores de las intervenciones, calculando las métricas de precisión y almacenándolas en un diccionario.
+    Procesa un archivo XML con una iniciativa parlamentaria, extrae los intervinientes, segmenta los textos, 
+    entrena un modelo y predice los autores de las intervenciones mostrando por pantalla los resultados.
 
     Args:
         path (str): Ruta al archivo XML.
-
-    Returns:
-        dict: Diccionario con los resultados de las métricas.
     """
 
+    print(f'Cargando archivo XML desde: {path}')
     tree = ET.parse(path)
     root = tree.getroot()
+
+    print('Procesando intervinientes...')
     etiq_intervienen = root.find('.//intervienen')
     nombres_completos = procesar_etiq_intervienen(etiq_intervienen)
     etiq_presidente = root.find('.//presidente')
@@ -351,6 +358,7 @@ def procesar_archivo(path):
 
     texto_completo = []
 
+    print('Extrayendo las intervenciones de la iniciativa...')
     # Para cada intervención y cada párrafo obtenemos el texto limpio
     for intervencion in root.findall('.//intervencion'):
         texto_intervencion = []
@@ -365,13 +373,12 @@ def procesar_archivo(path):
 
     texto_completo = '\n'.join(texto_completo)
 
-    # Lo primero que haremos es cargar nuestro dataset con todas las intervenciones totales
+    print('Cargando dataset general de intervenciones...')
     df = pd.read_csv('/Users/juan/Desktop/TFG/code/datasets/diputados/diputados_dip/intervenciones_filtradas_menos10.csv', delimiter='\t')
     
     # Eliminamos todas las columnas menos interviniente, texto y numero_diario
     df = df.drop(columns=['tipo_sesion', 'organo', 'fecha', 'tipo_iniciativa', 'materias','extracto', 'proponentes'])
     
-    # Normalizar las tildes de nombres_completos
     df['interviniente'] = df['interviniente'].apply(normalizar_tildes)
     nombres_completos = [normalizar_tildes(nombre) for nombre in nombres_completos]
 
@@ -384,6 +391,7 @@ def procesar_archivo(path):
     # Creamos un diccionario con los textos de cada interviniente
     dic_textos = {interviniente: [] for interviniente in nombres_completos}
 
+    print('Obteniendo otras intervenciones de cada interviniente...')
     # Añadimos los textos al diccionario
     for index, row in df.iterrows():
         autor = row['interviniente']
@@ -406,13 +414,13 @@ def procesar_archivo(path):
 
     textos, autores = preparar_datos(dic_textos)
 
+    print('Creando dataframe con las intervenciones...')
     # Creamos un dataframe a partir de los textos y autores
     new_df = pd.DataFrame({'texto': textos, 'autor': autores})
 
     # Balanceamos el conjunto de datos
     min_count = new_df['autor'].value_counts().min()
 
-    # Almaceno el numero de autores en new_df
     if min_count < len(new_df['autor'].unique()):
         min_count = len(new_df['autor'].unique())
 
@@ -426,18 +434,16 @@ def procesar_archivo(path):
         
         df_balanceado = pd.concat([df_balanceado, df_author_resampled])
 
-    X_train, X_test, y_train, y_test = train_test_split(df_balanceado['texto'], df_balanceado['autor'], test_size=0.2,stratify=df_balanceado['autor'] ,random_state=42)
+    print('Dividiendo datos en entrenamiento y prueba...')
+    X_train, X_test, y_train, y_test = train_test_split(df_balanceado['texto'], df_balanceado['autor'], test_size=0.2, stratify=df_balanceado['autor'], random_state=42)
 
-
+    print('Entrenando modelo...')
     # Crear y entrenar el modelo 
-    # tfidf_vectorizer de caracteres con rango entre 2 y 5
     tfidf_vectorizer = TfidfVectorizer(analyzer='char', ngram_range=(2, 5))
-
-    # modelo = make_pipeline(tfidf_vectorizer, MultinomialNB())
     modelo = make_pipeline(tfidf_vectorizer, LogisticRegression(multi_class='multinomial', dual=False))
-    
     modelo.fit(X_train, y_train)
 
+    print('Segmentando texto completo y prediciendo autores...')
     # Predecir los autores de las intervenciones
     intervenciones_plano = segmentar_texto(texto_completo)
     atribuciones = []
@@ -446,129 +452,22 @@ def procesar_archivo(path):
             autor_pred = modelo.predict([intervencion])[0]
             atribuciones.append((intervencion, autor_pred))
 
-    # Calcular las métricas
-    dic_atribuciones_ciertas = {}
-    dic_atribuciones_ciertas = {autor: [] for autor in apellidos}
+    print('Resultados:')
+    for intervencion, autor in atribuciones:
+        print(f'Intervención: {intervencion}... -> Autor: {autor}')
+        print('---' * 20)
 
 
-    for intervencion in root.findall('.//intervencion'):
-        interviniente = intervencion.find('.//interviniente').text
-        nombre = obtener_apellidos_limpios(interviniente)
-
-        texto_intervencion = []
-        for parrafo in intervencion.findall('.//parrafo'):
-            if parrafo.text:
-                texto_intervencion.append(parrafo.text)
-        texto_intervencion = " ".join(texto_intervencion)
-        texto_intervencion = limpiar_texto(texto_intervencion)
-        texto_intervencion = preprocesar_texto(texto_intervencion)
-
-        dic_atribuciones_ciertas[nombre].append(texto_intervencion)
-
-    resultados = {autor: {'TP': 0, 'FP': 0, 'Parrafos': 0} for autor in apellidos}
-
-    for atribucion in atribuciones:
-        texto, autor  = atribucion
-        autor = autor.split("-")
-        autor = "-".join(autor[-2:])
-        if autor in dic_atribuciones_ciertas and texto in dic_atribuciones_ciertas[autor]:
-            resultados[autor]['TP'] += 1
-        else:
-            if autor in resultados:
-                resultados[autor]['FP'] += 1
-
-    return resultados
+        # print(f'Texto: "{intervencion}" -> Autor: {autor}')
 
 
-def procesar_carpeta(path):
-    """
-    Para una ejecución masiva de archivos, procesa una carpeta con archivos XML de iniciativas. Crea un dataframe con las iniciativas
-    y otro con los autores, calculando las métricas de precisión para cada uno de ellos.
-
-    Args:
-        path (str): Ruta a la carpeta con los archivos XML.
-
-    Returns:
-        Tuple[pd.DataFrame, pd.DataFrame]: Dataframes con las métricas de las iniciativas y los autores.
-    """
-    df_iniciativas = pd.DataFrame(columns=['iniciativa', 'num_intervinientes', 'TP', 'FP'])
-    df_autores = pd.DataFrame(columns=['Autor', 'TP','FP'])
-    iteracion = 0
-
-    for archivo in os.listdir(path):
-        if archivo.endswith('.xml'):
-            print(f'Procesando archivo {iteracion}: {archivo}')
-            path_completo = os.path.join(path, archivo)
-
-            try:
-                resultados = procesar_archivo(path_completo)
-
-                num_intervinientes = len(resultados)
-                TP_totales = sum([datos['TP'] for autor, datos in resultados.items()])
-                FP_totales = sum([datos['FP'] for autor, datos in resultados.items()])
-                
-                nueva_iniciativa = {'iniciativa': archivo, 'num_intervinientes': num_intervinientes, 'TP': TP_totales, 'FP': FP_totales}
-                print(f'Iniciativa: {archivo}')
-                df_iniciativas.loc[len(df_iniciativas)] = nueva_iniciativa
-                df_iniciativas = df_iniciativas.reset_index(drop=True)
-
-                for autor, datos in resultados.items():
-                    if autor in df_autores['Autor'].values:
-                        df_autores.loc[df_autores['Autor'] == autor, 'TP'] += datos['TP']
-                        df_autores.loc[df_autores['Autor'] == autor, 'FP'] += datos['FP']
-                    else:
-                        nuevo_autor = {'Autor': autor, 'TP': datos['TP'], 'FP': datos['FP']}
-                        df_autores.loc[len(df_autores)] = nuevo_autor
-                        df_autores = df_autores.reset_index(drop=True)
-
-            except Exception as e:
-                print(f'Error al procesar el archivo {archivo}: {e}')
-                continue
-
-            iteracion += 1
-            print(f'Iteración {iteracion} completada')
-        
-    return df_iniciativas, df_autores
-
-def guardarDFs(df_iniciativas, df_autores, output_path):
-    """
-    Guarda los dataframes de iniciativas y autores en archivos CSV.
-
-    Args:
-        df_iniciativas (pd.DataFrame): Dataframe con las métricas de las iniciativas.
-        df_autores (pd.DataFrame): Dataframe con las métricas de los autores.
-        output_path (str): Ruta a la carpeta de salida.
-    """
-    # Calcular las métricas de precisión
-    df_iniciativas['parrafos'] = df_iniciativas['TP'] + df_iniciativas['FP']
-    df_iniciativas['precision'] = df_iniciativas['TP'] / df_iniciativas['parrafos']
-
-    # Fusionar el dataframe de diputados con el de nombres
-    df_nombres = pd.read_csv('/Users/juan/Desktop/TFG/code/datasets/lista-dip.csv')
-    df_nombres['apellidos'] = df_nombres['nombre'].apply(lambda x: '-'.join(x.split('-')[-2:]))
-    df_autores['apellidos'] = df_autores['Autor'].apply(lambda x: '-'.join(x.split("-")[-2:]))
-
-    df_intervenciones = pd.merge(df_autores, df_nombres, on='apellidos', how='inner')
-    df_intervenciones = df_intervenciones.drop(columns=['apellidos', 'Autor'])
-    df_intervenciones = df_intervenciones[['nombre', 'intervenciones', 'TP', 'FP']]
-    df_intervenciones = df_intervenciones.reset_index(drop=True)
-    df_intervenciones['precision'] = df_intervenciones['TP'] / (df_intervenciones['TP'] + df_intervenciones['FP'])
-    df_intervenciones = df_intervenciones.rename(columns={'nombre': 'interviniente'})
-
-    df_iniciativas.to_csv(output_path + "/iniciativas.csv", index=False)
-    df_intervenciones.to_csv(output_path + "/intervenciones.csv", index=False)
 
 
-    
-if __name__ == "__main__":
-    # Argumentos de la línea de comandos
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--data_path", help="Path a la carpeta con las iniciativas", required=True)
-    parser.add_argument("--output_path", help="Path a la carpeta de salida", required=True)
-    args = parser.parse_args()
-    
-    # Procesar la carpeta
-    df_iniciativas, df_autores = procesar_carpeta(args.data_path)
-    
-    # Guardar los resultados
-    guardarDFs(df_iniciativas, df_autores, args.output_path)
+if __name__ == '__main__':
+    # Pedimos por parámetro el archivo XML que queremos cargar
+    archivo_xml = input("Ingrese el nombre del XML que desea cargar: ")
+    ruta_carpeta_xml = "/Users/juan/Desktop/TFG/code/datasets/diputados/iniciativas_reducidas/funcionales/"
+
+    # Solo recibimos el nombre del archivo, la ruta ya sabemos que es /Users/juan/Desktop/TFG/code/datasets/diputados/diputados_iniciativa/
+    archivo_xml = ruta_carpeta_xml + archivo_xml
+    procesar_archivo(archivo_xml)
