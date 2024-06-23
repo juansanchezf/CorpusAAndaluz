@@ -17,24 +17,45 @@ import argparse
 
 
 def procesar_etiq_intervienen(etiq_intervienen):
+    """
+    Procesa la etiqueta de los intervinientes para extraer los nombres completos.
+
+    Args:
+        etiq_intervienen: Objeto XML que contiene la etiqueta de los intervinientes.
+
+    Returns:
+        List[str]: Lista de nombres completos procesados.
+    """
     if etiq_intervienen is not None:
         texto_intervienen = etiq_intervienen.text
     else:
         texto_intervienen = ""
         print("No hay diputados que intervengan en la iniciativa")
+
     nombre_completo_pattern = r'(D\.\s|Dña\.\s)([^,]+)'
     matches = re.findall(nombre_completo_pattern, texto_intervienen)
     nombres_completos = []
-    
+
     for prefix, nombre_completo in matches:
         nombre_completo = nombre_completo.strip()
-        nombre_limpio =  nombre_completo.upper().replace("-", "--")
-        nombre_limpio =  nombre_limpio.replace(" ", "-")
+        nombre_limpio = nombre_completo.upper().replace("-", "--")
+        nombre_limpio = nombre_limpio.replace(" ", "-")
         nombre_limpio = nombre_limpio.replace("\n", " ").replace("\r", " ").strip()
         nombres_completos.append(nombre_limpio)
+
     return nombres_completos
 
+
 def comprobar_compuesto(nombre):
+    """
+    Verifica y extrae los apellidos compuestos a partir del nombre completo.
+
+    Args:
+        nombre (str): Nombre completo con guiones.
+
+    Returns:
+        str: Apellidos compuestos del nombre.
+    """
     palabras = nombre.split("-")
     extraer = palabras.count("") + 2
     palabras = [palabra for palabra in palabras if palabra]
@@ -42,7 +63,17 @@ def comprobar_compuesto(nombre):
 
     return apellidos
 
+
 def obtener_apellidos_guiones(root):
+    """
+    Obtiene una lista de apellidos compuestos con guiones de los intervinientes y el presidente.
+
+    Args:
+        root: Objeto XML que contiene la estructura del documento.
+
+    Returns:
+        List[str]: Lista de apellidos compuestos con guiones.
+    """
     etiq_intervienen = root.find('.//intervienen')
     nombres_completos = procesar_etiq_intervienen(etiq_intervienen)
     nombres_completos = eliminar_punto_final(nombres_completos)
@@ -58,7 +89,17 @@ def obtener_apellidos_guiones(root):
 
     return apellidos
 
+
 def procesar_etiq_presidente(etiq_presidente):
+    """
+    Procesa la etiqueta del presidente para extraer el nombre completo.
+
+    Args:
+        etiq_presidente: Objeto XML que contiene la etiqueta del presidente.
+
+    Returns:
+        str: Nombre completo del presidente o None si no se encuentra.
+    """
     if etiq_presidente is not None:
         texto_presidente = etiq_presidente.text.strip()
         presidente_nombre_pattern = r'(Excma\.|Excmo\.|Ilmo.|Ilma.)\s(Sr\.|Sra\.)\s(Dña\.|D\.)\s([\w\s\.]+)'
@@ -72,8 +113,18 @@ def procesar_etiq_presidente(etiq_presidente):
     else:
         print("No hay presidente/a en la iniciativa")
         return None
-    
+
+
 def eliminar_punto_final(nombres):
+    """
+    Elimina el punto final de cada nombre en la lista de nombres.
+
+    Args:
+        nombres (List[str]): Lista de nombres.
+
+    Returns:
+        List[str]: Lista de nombres sin punto final.
+    """
     nombres_sin_punto = []
     for nombre in nombres:
         if nombre.endswith("."):
@@ -81,7 +132,17 @@ def eliminar_punto_final(nombres):
         nombres_sin_punto.append(nombre)
     return nombres_sin_punto
 
+
 def comprobar_presidente(root):
+    """
+    Verifica si el presidente ha intervenido en la iniciativa.
+
+    Args:
+        root: Objeto XML que contiene la estructura del documento.
+
+    Returns:
+        bool: True si el presidente ha intervenido, False de lo contrario.
+    """
     etiq_presidente = root.find('.//presidente')
     if etiq_presidente is not None:
         texto_presidente = etiq_presidente.text.strip()
@@ -103,8 +164,20 @@ def comprobar_presidente(root):
                 nombre = nombre.replace(",", "")
                 if nombre == nombre_presidente_comprobar:
                     return True
+    return False
+
 
 def comprobar_intervinientes(root, apellidos):
+    """
+    Verifica y agrega los intervinientes a la lista de apellidos si no están presentes.
+
+    Args:
+        root: Objeto XML que contiene la estructura del documento.
+        apellidos (List[str]): Lista de apellidos existentes.
+
+    Returns:
+        None
+    """
     for intervencion in root.findall('.//intervencion'):
         if intervencion is not None:
             nombre = intervencion.find('.//interviniente').text
@@ -117,12 +190,32 @@ def comprobar_intervinientes(root, apellidos):
             if nombre not in apellidos:
                 apellidos.append(nombre)
 
+
 def normalizar_tildes(text):
+    """
+    Normaliza las tildes en un texto.
+
+    Args:
+        text (str): Texto a normalizar.
+
+    Returns:
+        str: Texto normalizado.
+    """
     if isinstance(text, str):
         return unicodedata.normalize('NFC', text)
     return text
 
+
 def limpiar_nombre(nombre_completo):
+    """
+    Limpia y formatea un nombre completo.
+
+    Args:
+        nombre_completo (str): Nombre completo a limpiar.
+
+    Returns:
+        str: Nombre limpio y formateado.
+    """
     particulas = ['DEL', 'DE', 'LA', 'LOS', 'LAS', 'Y']
     patron_particulas = r'\b(?:' + '|'.join(particulas) + r')\b'
     nombre_limpio = re.sub(patron_particulas, ' ', nombre_completo)
@@ -136,7 +229,17 @@ def limpiar_nombre(nombre_completo):
     nombre_limpio = '-'.join(palabras)
     return nombre_limpio
 
+
 def preparar_datos(diccionario):
+    """
+    Prepara los datos a partir de un diccionario de textos y autores.
+
+    Args:
+        diccionario (dict): Diccionario con autores como claves y listas de textos como valores.
+
+    Returns:
+        Tuple[List[str], List[str]]: Lista de textos preprocesados y lista de autores correspondientes.
+    """
     textos = []
     autores = []
     for autor, lista_textos in diccionario.items():
@@ -145,15 +248,33 @@ def preparar_datos(diccionario):
             autores.append(autor)
     return textos, autores
 
+
 def segmentar_texto(texto):
-    # Usar una expresión regular para dividir el texto en segmentos basados en las etiquetas
+    """
+    Segmenta un texto en base a etiquetas de inicio y fin de intervención.
+
+    Args:
+        texto (str): Texto a segmentar.
+
+    Returns:
+        List[str]: Lista de segmentos de texto limpios y procesados.
+    """
     segmentos = re.split(r'<<INTERVENCIÓN_FIN>>', texto)
-    # Limpiar y procesar cada segmento
     segmentos_limpios = [preprocesar_texto(segmento.replace('<<INTERVENCIÓN_INICIO>>', '').strip()) for segmento in segmentos if segmento.strip()]
 
     return segmentos_limpios
 
+
 def obtener_apellidos_limpios(nombre):
+    """
+    Obtiene los apellidos limpios y formateados de un nombre completo.
+
+    Args:
+        nombre (str): Nombre completo a procesar.
+
+    Returns:
+        str: Apellidos limpios y formateados.
+    """
     nombre = limpiar_nombre(nombre)
     palabras = nombre.split()
     nombre = " ".join(palabras[2:4]).upper()
