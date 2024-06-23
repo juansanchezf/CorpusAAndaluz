@@ -48,7 +48,7 @@ def procesar_etiq_intervienen(etiq_intervienen):
 
 def comprobar_compuesto(nombre):
     """
-    Verifica y extrae los apellidos compuestos a partir del nombre completo.
+    Verifica y extrae los apellidos compuestos (de haberlos) a partir del nombre completo.
 
     Args:
         nombre (str): Nombre completo con guiones.
@@ -66,7 +66,7 @@ def comprobar_compuesto(nombre):
 
 def obtener_apellidos_guiones(root):
     """
-    Obtiene una lista de apellidos compuestos con guiones de los intervinientes y el presidente.
+    Obtiene una lista de únicamente los apellidos de los intervinientes separados por guiones.
 
     Args:
         root: Objeto XML que contiene la estructura del documento.
@@ -193,7 +193,7 @@ def comprobar_intervinientes(root, apellidos):
 
 def normalizar_tildes(text):
     """
-    Normaliza las tildes en un texto.
+    Normaliza las tildes en un texto a formato NFC (forma normalizada).
 
     Args:
         text (str): Texto a normalizar.
@@ -208,7 +208,7 @@ def normalizar_tildes(text):
 
 def limpiar_nombre(nombre_completo):
     """
-    Limpia y formatea un nombre completo.
+    Elimina de un nombre posibles partículas y conjunciones.
 
     Args:
         nombre_completo (str): Nombre completo a limpiar.
@@ -286,7 +286,7 @@ def obtener_apellidos_limpios(nombre):
 
 def limpiar_texto(texto):
     """
-    Eliminamos caractesres especiales del texto de intervención 
+    Eliminamos caracteres especiales del texto de intervención 
     como guiones, comillas o corchetes.
     """
     # Eliminar carácteres especiales
@@ -318,6 +318,17 @@ def preprocesar_texto(texto):
     return texto
 
 def procesar_archivo(path):
+    """
+    Procesa un archivo XML con una iniciativa parlamentaria, extrae los intervinientes, segmenta los textos, entrena un modelo 
+    y predice los autores de las intervenciones, calculando las métricas de precisión y almacenándolas en un diccionario.
+
+    Args:
+        path (str): Ruta al archivo XML.
+
+    Returns:
+        dict: Diccionario con los resultados de las métricas.
+    """
+
     tree = ET.parse(path)
     root = tree.getroot()
     etiq_intervienen = root.find('.//intervienen')
@@ -465,6 +476,16 @@ def procesar_archivo(path):
 
 
 def procesar_carpeta(path):
+    """
+    Para una ejecución masiva de archivos, procesa una carpeta con archivos XML de iniciativas. Crea un dataframe con las iniciativas
+    y otro con los autores, calculando las métricas de precisión para cada uno de ellos.
+
+    Args:
+        path (str): Ruta a la carpeta con los archivos XML.
+
+    Returns:
+        Tuple[pd.DataFrame, pd.DataFrame]: Dataframes con las métricas de las iniciativas y los autores.
+    """
     df_iniciativas = pd.DataFrame(columns=['iniciativa', 'num_intervinientes', 'TP', 'FP'])
     df_autores = pd.DataFrame(columns=['Autor', 'TP','FP'])
     iteracion = 0
@@ -505,6 +526,15 @@ def procesar_carpeta(path):
     return df_iniciativas, df_autores
 
 def guardarDFs(df_iniciativas, df_autores, output_path):
+    """
+    Guarda los dataframes de iniciativas y autores en archivos CSV.
+
+    Args:
+        df_iniciativas (pd.DataFrame): Dataframe con las métricas de las iniciativas.
+        df_autores (pd.DataFrame): Dataframe con las métricas de los autores.
+        output_path (str): Ruta a la carpeta de salida.
+    """
+    # Calcular las métricas de precisión
     df_iniciativas['parrafos'] = df_iniciativas['TP'] + df_iniciativas['FP']
     df_iniciativas['precision'] = df_iniciativas['TP'] / df_iniciativas['parrafos']
 
@@ -526,7 +556,7 @@ def guardarDFs(df_iniciativas, df_autores, output_path):
 
     
 if __name__ == "__main__":
-    # Parse command line arguments
+    # Argumentos de la línea de comandos
     parser = argparse.ArgumentParser()
     parser.add_argument("--data_path", help="Path a la carpeta con las iniciativas", required=True)
     parser.add_argument("--output_path", help="Path a la carpeta de salida", required=True)
@@ -537,5 +567,3 @@ if __name__ == "__main__":
     
     # Guardar los resultados
     guardarDFs(df_iniciativas, df_autores, args.output_path)
-    
-    
